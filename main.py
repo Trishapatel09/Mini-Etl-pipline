@@ -1,6 +1,7 @@
 # import requests
 import json
 import pandas as pd
+import sqlite3
 
 # url = "https://api.open-meteo.com/v1/forecast?latitude=23.2599&longitude=77.4126&current=temperature_2m,relative_humidity_2m,wind_speed_10m"
 
@@ -37,3 +38,24 @@ print(clean_data)
 df=pd.DataFrame([clean_data])
 
 print(df)
+
+connection = sqlite3.connect("weather.db")
+
+df.to_sql("weather_data",connection , if_exists="replace", index= False)
+
+cursor = connection.cursor()
+
+# cursor.execute("""
+# SELECT name FROM sqlite_master
+# WHERE type='table';
+# """)
+
+# print(cursor.fetchall())
+
+cursor.execute("SELECT * FROM weather_data")
+
+rows = cursor.fetchall()
+
+print(rows)
+
+connection.close()
