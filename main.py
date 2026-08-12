@@ -1,31 +1,43 @@
-# import requests
+# IMPORTS
+
+import requests
 import json
 import pandas as pd
 import sqlite3
 
-# url = "https://api.open-meteo.com/v1/forecast?latitude=23.2599&longitude=77.4126&current=temperature_2m,relative_humidity_2m,wind_speed_10m"
+# EXTRACT - Fetch data from API
 
-# response = requests.get(url)
+url = "https://api.open-meteo.com/v1/forecast?latitude=23.2599&longitude=77.4126&current=temperature_2m,relative_humidity_2m,wind_speed_10m"
 
-# data = response.json()
+response = requests.get(url)
 
-# temperature = data["current"]["temperature_2m"]
-# humidity = data["current"]["relative_humidity_2m"]
-# wind_speed = data["current"]["wind_speed_10m"]
+data = response.json()
 
-# print("Temperature:", temperature)
-# print("Humidity:", humidity)
-# print("Wind Speed:", wind_speed)
+# Save raw API data as JSON
 
-# with open("raw_data.json", "w") as file:
-#     json.dump(data,file,indent=4)
-    
+with open("raw_data.json", "w") as file:
+    json.dump(data, file, indent=4)
 
 
-with open("raw_data.json", "r") as file:
-    data = json.load(file)
+# Read raw JSON data
+
+try:
+    with open("raw_data.json", "r") as file:
+        data = json.load(file)
+
+except FileNotFoundError:
+    print("raw_data.json file not found")
+    exit()
+
+except json.JSONDecodeError:
+    print("Invalid JSON data")
+    exit()
+
+
+# TRANSFORM - Clean the data
 
 current_data = data["current"]
+
 clean_data = {
     "time": current_data["time"],
     "temperature": current_data["temperature_2m"],
@@ -33,29 +45,53 @@ clean_data = {
     "wind_speed": current_data["wind_speed_10m"]
 }
 
-print(clean_data)
 
-df=pd.DataFrame([clean_data])
+# Convert cleaned data into DataFrame
 
-print(df)
+df = pd.DataFrame([clean_data])
 
-connection = sqlite3.connect("weather.db")
 
-df.to_sql("weather_data",connection , if_exists="replace", index= False)
+# VALIDATE - Check data quality
+
+print("Missing values:")
+print(df.isnull().sum())
+
+print("Duplicate rows:")
+print(df.duplicated().sum())
+
+print("Data types:")
+print(df.dtypes)
+
+print("Humidity valid:")
+print(df["humidity"].between(0, 100).all())
+
+
+# LOAD - Store data in SQLite
+
+try:
+    connection = sqlite3.connect("weather.db")
+
+    df.to_sql(
+        "weather_data",
+        connection,
+        if_exists="replace",
+        index=False
+    )
+
+except sqlite3.Error:
+    print("Database error occurred")
+    exit()
+
+
+# VERIFY - Check stored data
 
 cursor = connection.cursor()
-
-# cursor.execute("""
-# SELECT name FROM sqlite_master
-# WHERE type='table';
-# """)
-
-# print(cursor.fetchall())
 
 cursor.execute("SELECT * FROM weather_data")
 
 rows = cursor.fetchall()
 
+print("Stored data:")
 print(rows)
 
 connection.close()
